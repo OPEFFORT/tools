@@ -6,19 +6,19 @@ Here is some of my current thinking
 
 ## Project Commands
 
-### `ope new project <name>`
+### `ope project <name>`
 
-### `ope new book <name>`
+### `ope book new <name>`
 
-### `ope new container <name>`
+### `ope container new <name>`
 
 ## Book Commands
 
-### `ope new part <name>`
+### `ope part new <name>`
 
-### `ope new chapter <name>`
+### `ope chapter new <name>`
 
-### `ope new section <name>`
+### `ope section new <name>`
 
 ### `ope build`
 
