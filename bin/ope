@@ -55,10 +55,13 @@ EMAIL_SERVICE="gmail"
 # --------------------
 OPE_ORG_NAME="OPEFFORT"
 OPE_GITURL="git@github.com:${OPE_ORG_NAME}"
-OPE_CONFIG_DIR="opeconfig"
+OPE_CONFIG_DIR=".ope"
+OPE_CONFIG_NAME="${OPE_CONFIG_DIR}/name"
 OPE_PROJECT_TEMPLATE="project-template"
 OPE_CONTAINER_TEMPLATE="container-template"
 OPE_BOOK_TEMPLATE="book-template"
+OPE_BOOKS_DIR=books
+OPE_CONTAINER_DIR=containers
 
 UPSTREAM_BRANCHES=("main" "coursecontenttemplate" "Documentation")
 
@@ -151,9 +154,9 @@ clone_template() {
     [[ -z $name ]] && return 0
     [[ -z $branch ]] && branch=main
 
-    if ! $REPO_CMD $CLONE_TEMPLATE $branch $OPE_GITURL/${repo}.git $name; then
+    if ! $REPO_CMD $CLONE_TEMPLATE $branch $OPE_GITURL/${repo}.git $name >/dev/null 2>&1; then
 	echo "ERROR: ${FUNCNAME[0]}: failed to clone $repo:$branch as $name" > /dev/stderr
-	return -1
+	exit -1
     else
 	$RMDIR -rf $name/.git
     fi
@@ -172,7 +175,7 @@ function new_project
 
     # Help message
     if [[ -z $name || $name == '-h' ]]; then
-        echo "Usage:  ${0##*/} create <project name>"
+        echo "Usage:  ${0##*/} ${func_name} <project name>"
         echo "   create an organization using ope template of the name specified"
         echo "   eg. ope create MyProject"
         echo "   will create a new local repository seeded from the ope "
@@ -191,6 +194,59 @@ function new_project
 
         # Create the project from ope template
 	clone_template $OPE_PROJECT_TEMPLATE $name
+
+	# seed project config
+	if [[ -d $name/$OPE_CONFIG_DIR ]]; then
+  	    echo $name > $name/$OPE_CONFIG_NAME
+	else
+	    echo -e "$HEADER${Red}ERROR: FATAL could not locate ope project config dir${Color_Off}"
+            return -1
+        fi  
+    } 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE) 
+}
+
+findprojectdir()
+{
+    #FIXME:  Add code so that we can locate project root directory
+    #        from any where within the project tree.  Eg walk up looking for
+    #        .ope/name file.  The parent directory of .ope dir is project dir
+    if [[ -r ${OPE_CONFIG_NAME} ]]; then
+	pwd -P
+    else
+	echo -e "$HEADER${Red}ERROR: You don't seem to be in an ope project${Color_Off}" > /dev/stderr
+        exit -1
+    fi
+}
+
+function new_book
+#DESCRIPTION: create a new ope project from the ope templates
+{   
+    name=$1
+    
+    # Logging information
+    func_name=${FUNCNAME[0]}
+    func_args=$@
+    fc_header_logging "$func_name $func_args"
+
+    projectdir=$(findprojectdir)
+    
+    # Help message
+    if [[ -z $name || $name == '-h' ]]; then
+        echo "Usage:  ${0##*/} ${func_name} <book name>"
+        echo "   create a new book of the name specified"
+        echo "   eg. ope ${func_name} textbook"
+        return -1
+    fi
+
+    {
+        # Check if the book already exists 
+        if [[ -d ${OPE_BOOKS_DIR}/$name ]]; then
+            echo -e "$HEADER${Red}ERROR: book directory $name already exists${Color_Off}"
+            return -1
+        fi
+
+        # Create the project from ope template
+	clone_template $OPE_BOOK_TEMPLATE ${OPE_BOOKS_DIR}/$name
     } 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE) 
 }
 
