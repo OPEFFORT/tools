@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -x
+set -x
 # Copyright (C) 2022 by Jonathan Appavoo, Boston University
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -61,10 +61,18 @@ OPE_PROJECT_TEMPLATE="project-template"
 OPE_CONTAINER_TEMPLATE="container-template"
 OPE_BOOK_TEMPLATE="book-template"
 OPE_BOOKS_DIR=books
+OPE_BOOK_CONTENT_SOURCE=../../content
 OPE_CONTAINER_DIR=containers
+OPE_CONTENT_TEMPLATE="content-template"
+OPE_CONTENT_DIR=content
+OPE_CONTENT_EXAMPLES="content-examples"
+OPE_CONTENT_EXAMPLES_DIR="$OPE_CONTENT_DIR/examples"
+
+OPE_BOOK_CONTENT_SEEDS="${OPE_CONTENT_EXAMPLES_DIR}/book/intro.md ${OPE_CONTENT_EXAMPLES_DIR}/book/config.yml"
+OPE_CONTENT_SEEDS="${OPE_CONTENT_EXAMPLES_DIR}/css ${OPE_CONTENT_EXAMPLES_DIR}/python ${OPE_CONTENT_EXAMPLES_DIR}/src ${OPE_CONTENT_EXAMPLES_DIR}/images ${OPE_CONTENT_EXAMPLES_DIR}/images/logo.png"
+
 
 UPSTREAM_BRANCHES=("main" "coursecontenttemplate" "Documentation")
-
 # --------- Script begins here -------------
 
 # Script Configuration
@@ -89,13 +97,13 @@ BGreen='\033[1;32m'
 
 # Helper functions
 fc_header_logging (){
-    current_time=$(date +%T)
-    cwd=$(pwd)
+    local current_time=$(date +%T)
+    local cwd=$(pwd)
     echo "[${current_time}]: ${0##*/} $1 $cwd" >> $LOG_FILE
 }
 
 rolling_output () {
-    input=$(cat <&0 | tr '\r' '\n')
+    local input=$(cat <&0 | tr '\r' '\n')
     if [[ $VERBOSE -eq 0 ]]; then
         echo $input | while read line; do echo -ne "\033[2K\r"; printf "     ${Grey}$line${Color_Off}\r"; done
     else
@@ -104,52 +112,15 @@ rolling_output () {
 }
 
 
-verify_repo (){
-
-    # Check if we are inside a repository
-    if ! ${REPO_CMD} ${IF_INSIDE_REPO} &>/dev/null; then
-        echo -e "$HEADER${Red}ERROR: Not a valid repository${Color_Off}"
-        return -1
-    fi
-
-    # Check if we are inside an OPE repository
-    output=$(${REPO_CMD} ${CHECK_REMOTES})
-    if ! echo "$output" | grep -q "ope-upstream"; then
-        echo -e "$HEADER${Red}ERROR: Not a valid OPE repository${Color_Off}"
-        return -1
-    fi
-
-    # Check if we are inside the top level of the OPE repository
-    if [ "$(pwd)" != "$(${REPO_CMD} ${SHOW_TOP_LEVEL})" ]; then
-        cd "$(${REPO_CMD} ${SHOW_TOP_LEVEL})"
-    fi
-    
-}
-
-verify_project() {
-    # NYI
-    return -1
-}
-
-verify_book() {
-    # NYI
-    return -1
-}
-
-verify_container() {
-    # NYI
-    return -1
-}
-
 get_help_from_makefile(){
-    option=$1
+    local option=$1
     cat Makefile | grep -E '^[a-zA-Z0-9_%/-]+:.*?## .*$$' | grep -E "^${option}" | tr -d '#' |column -t -s : | tr '-' ' '
 }
 
 clone_template() {
-    repo=$1
-    name=$2
-    branch=$3
+    local repo=$1
+    local name=$2
+    local branch=$3
     [[ -z $repo ]] && return 0
     [[ -z $name ]] && return 0
     [[ -z $branch ]] && branch=main
@@ -158,19 +129,20 @@ clone_template() {
 	echo "ERROR: ${FUNCNAME[0]}: failed to clone $repo:$branch as $name" > /dev/stderr
 	exit -1
     else
-	$RMDIR -rf $name/.git
+	$RMDIR $name/.git
     fi
     return 0
 }
 
 function new_project
 #DESCRIPTION: create a new ope project from the ope templates
-{   
-    name=$1
+{
+    set -x
+    local name=$1
     
     # Logging information
-    func_name=${FUNCNAME[0]}
-    func_args=$@
+    local func_name=${FUNCNAME[0]}
+    local func_args=$@
     fc_header_logging "$func_name $func_args"
 
     # Help message
@@ -203,13 +175,25 @@ function new_project
             return -1
         fi
 
-	# seed project content
-	clone_temlate $OPE_CONTENT_TEMPLATE $name/$OPE_CONTENT_DIR
-	
+	# seed project content structure
+	clone_template $OPE_CONTENT_TEMPLATE $name/$OPE_CONTENT_DIR
+
+	# get a copy of the example content
+        clone_template $OPE_CONTENT_EXAMPLES $name/$OPE_CONTENT_EXAMPLES_DIR
+
+	# seed local copies of typical content from examples
+	for seed in $OPE_CONTENT_SEEDS; do
+	    local sb=$(basename $seed)
+	    if [[ ! -a $name/$OPE_CONTENT_DIR/$sb ]]; then
+		cp -r $name/$seed $name/$OPE_CONTENT_DIR
+	    fi
+	done
+
+	    
     } 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE) 
 }
 
-findprojecdir()
+findprojectdir()
 {
     if [[ -r ${OPE_CONFIG_NAME} ]]; then
 	pwd -P
@@ -231,17 +215,28 @@ projectdir()
     fi
 }
 
+new_part()
+{
+    local name=$1
+    if [[ -z $name ]]; then
+	return -1;
+    fi
+    if [[ ! -a $name ]]; then
+	cp -r $OPE_EXAMPLE_PART $name
+    fi
+}
+
 function new_book
 #DESCRIPTION: create a new ope project from the ope templates
 {   
-    name=$1
+    local name=$1
     
     # Logging information
-    func_name=${FUNCNAME[0]}
-    func_args=$@
+    local func_name=${FUNCNAME[0]}
+    local func_args=$@
     fc_header_logging "$func_name $func_args"
 
-    projectdir=$(projectdir)
+    local pdir=$(projectdir)
     
     # Help message
     if [[ -z $name || $name == '-h' ]]; then
@@ -251,7 +246,7 @@ function new_book
         return -1
     fi
     (
-	cd $projectdir
+	cd $pdir
         # Check if the book already exists 
         if [[ -d ${OPE_BOOKS_DIR}/$name ]]; then
 	    echo -e "$HEADER${Red}ERROR: book directory $name already exists${Color_Off}"
@@ -261,55 +256,50 @@ function new_book
         # Create the book from ope book template
 	clone_template $OPE_BOOK_TEMPLATE ${OPE_BOOKS_DIR}/$name
 
-	# Create the minimum necessary book specific content files
-	for file in $OPE_BOOK_CONTENT_FILE; do
-	    if ! cp $file ${OPE_CONTENT_DIR}/${name}_${file}; then
-		echo "ERROR creating ${OPE_CONTENT_DIR}/${name}_$file" > /dev/stderr
+	# link book content to project content
+	(
+	    cd ${OPE_BOOKS_DIR}/$name
+	    if [[ ! -d ${OPE_BOOK_CONTENT_SOURCE} ]]; then
+		echo "ERROR can't find ope project content directory"
 		exit -1
 	    fi
+	    ln -s ${OPE_BOOK_CONTENT_SOURCE} content
+	)
+	# Create the minimum necessary book specific content files
+	for file in $OPE_BOOK_CONTENT_SEEDS; do
+	    local fb=$(basename $file)
+	    if [[ ! -a ${OPE_CONTENT_DIR}/${name}_${fb} ]]; then
+		if ! cp $file ${OPE_CONTENT_DIR}/${name}_${fb}; then
+		    echo "ERROR creating ${OPE_CONTENT_DIR}/${name}_$fb" > /dev/stderr
+		    exit -1
+		fi
+	    fi
 	done
+	cat > ${OPE_CONTENT_DIR}/${name}_toc.yml <<EOF
+format: jb-book
+root: ${name}_intro
+parts:
+- caption: 'Part 1'
+  numbered: true
+  chapters:
+  - file: part1/chapter
+    sections: 
+    - file: part1/section
+EOF
     ) 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE) 
 }
 
 function update
 #DESCRIPTION: update and rebase changes from the OPE framework
 {
-    option=$1
-    verify_repo
-
-    if [[ ! -z "$option" && $option = '-h' ]]; then
-        echo "Usage:  ${0##*/} update [options]"
-        echo "   will update and rebase based on the current branch"
-        echo "   options:"
-        echo "       -u: update the OPE framework only and do not perform a rebase"
-        echo "   See the ope gettings started doc for more info."
-        return -1
-    fi
-
-    current_branch=$(${REPO_CMD} ${CURRENT_BRANCH})
-    echo -e "$HEADER${Cyan}Updating the book repository on ${Color_Off}${BCyan}${current_branch}${Color_Off}"
-    ${REPO_CMD} ${SWITCH_BRANCH} ${current_branch}-source
-    ${REPO_CMD} ${PULL} ope-upstream ${current_branch}
-    ${REPO_CMD} ${SWITCH_BRANCH} ${current_branch}
-
-    if [[ $option = '-u' ]]; then
-        echo -e "$HEADER${Cyan}Updating the OPE framework only${Color_Off}"
-        echo -e "$HEADER${BGreen}OPE upstream ${current_branch}${Color_Off}${Green} has been successfully updated ${Color_Off}"
-        return
-    fi
-
-    echo -e "$HEADER${Cyan}Rebasing the book repository on ${Color_Off}${BCyan}${current_branch}${Color_Off}"
-    ${REPO_CMD} ${REBASE} ${current_branch}-source
-    echo -e "$HEADER${BGreen}${current_branch}${Color_Off}${Green} has been successfully updated ${Color_Off}"
-
-
+  return -1
 }
 
 function build
 #DESCRIPTION: build the book
 {
-    option=$1
-    verify_repo
+    local option=$1
+
 
     if [[ $option = '-h' ]]; then
         echo "Usage:  ${0##*/} build [options]"
@@ -343,8 +333,8 @@ function build
 function pub
 #DESCRIPTION: publish the book
 {   
-    option=$1
-    verify_repo
+    local option=$1
+
 
     if [[ $option = '-h' ]]; then
         echo "Usage:  ${0##*/} pub [options]"
@@ -367,9 +357,15 @@ function pub
     echo -e "$HEADER${Green}${current_branch} has been successfully published ${Color_Off}"
 }
 
+function new_course
+#DESCRIPTION: Creates a new ope project seeded with 3 books (textbook, lecture notes, and labmanual) and one container 
+{
+    return 0;
+}
+
 print_func_page()
 {
-    func_names=($(grep '^function' $0 | awk '{print $2}'))
+    local func_names=($(grep '^function' $0 | awk '{print $2}'))
     grep '^#DESCRIPTION' $0 | awk -F: '{print $2}' | while read line ; do echo -e "  ${Blue}${func_names[$i]}${Color_Off}, $line\n"; i=$((i+1)); done | column -t -s,
 }
 
