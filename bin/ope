@@ -201,17 +201,30 @@ function new_project
 	else
 	    echo -e "$HEADER${Red}ERROR: FATAL could not locate ope project config dir${Color_Off}"
             return -1
-        fi  
+        fi
+
+	# seed project content
+	clone_temlate $OPE_CONTENT_TEMPLATE $name/$OPE_CONTENT_DIR
+	
     } 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE) 
 }
 
-findprojectdir()
+findprojecdir()
 {
-    #FIXME:  Add code so that we can locate project root directory
-    #        from any where within the project tree.  Eg walk up looking for
-    #        .ope/name file.  The parent directory of .ope dir is project dir
     if [[ -r ${OPE_CONFIG_NAME} ]]; then
 	pwd -P
+    elif [[ $(pwd -P) != / ]]; then
+	cd ..
+	findprojectdir
+    fi	
+}
+
+projectdir()
+{
+    pd=$(findprojectdir)
+    if [[ -n $pd ]]; then
+	echo $pd
+	return 0
     else
 	echo -e "$HEADER${Red}ERROR: You don't seem to be in an ope project${Color_Off}" > /dev/stderr
         exit -1
@@ -228,7 +241,7 @@ function new_book
     func_args=$@
     fc_header_logging "$func_name $func_args"
 
-    projectdir=$(findprojectdir)
+    projectdir=$(projectdir)
     
     # Help message
     if [[ -z $name || $name == '-h' ]]; then
@@ -237,17 +250,25 @@ function new_book
         echo "   eg. ope ${func_name} textbook"
         return -1
     fi
-
-    {
+    (
+	cd $projectdir
         # Check if the book already exists 
         if [[ -d ${OPE_BOOKS_DIR}/$name ]]; then
-            echo -e "$HEADER${Red}ERROR: book directory $name already exists${Color_Off}"
-            return -1
+	    echo -e "$HEADER${Red}ERROR: book directory $name already exists${Color_Off}"
+	    return -1
         fi
 
-        # Create the project from ope template
+        # Create the book from ope book template
 	clone_template $OPE_BOOK_TEMPLATE ${OPE_BOOKS_DIR}/$name
-    } 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE) 
+
+	# Create the minimum necessary book specific content files
+	for file in $OPE_BOOK_CONTENT_FILE; do
+	    if ! cp $file ${OPE_CONTENT_DIR}/${name}_${file}; then
+		echo "ERROR creating ${OPE_CONTENT_DIR}/${name}_$file" > /dev/stderr
+		exit -1
+	    fi
+	done
+    ) 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE) 
 }
 
 function update
