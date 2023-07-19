@@ -226,6 +226,33 @@ new_part()
     fi
 }
 
+function repo_add
+{
+    local repourl=$1
+    local name=$2
+
+    
+    # Logging information
+    local func_name=${FUNCNAME[0]}
+    local func_args=$@
+    fc_header_logging "$func_name $func_args"
+
+    local pdir=$(projectdir)
+    
+    # Help message
+    if [[ -z $name || $name == '-h' ]]; then
+        echo "Usage:  ${0##*/} ${func_name} [git remote url] [name]"
+        echo "   Add a git repository to the project to store and tack"
+        echo "   all the project content.  With now arguments will "
+	echo "   Indicate if there is a repo for the project and what it is"
+	echo "   Eg. ope repo_add git@github.com:myuser/opeproject.git"
+        return -1
+    fi
+    (
+	cd $pdir
+	if [[ -z $
+    ) 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE) 
+}
 function new_book
 #DESCRIPTION: create a new ope project from the ope templates
 {   
