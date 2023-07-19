@@ -34,11 +34,11 @@ CLONE="clone"
 CLONE_TEMPLATE="$CLONE --depth 1 --branch"
 PULL="pull"
 PUSH="push"
-PUSH_FIRST="push -f -u"
+PUSH_FIRST="push -u"
 SWITCH_BRANCH="checkout"
 CREATE_BRANCH="checkout -b"
 IGNORE_FILE=".gitignore"
-RENAME_BRANCH="branch -m"
+RENAME_BRANCH="branch -M"
 FETCH="fetch"
 ADD="add"
 COMMIT="commit -m"
@@ -46,7 +46,7 @@ CURRENT_BRANCH="branch --show-current"
 REBASE="rebase"
 IF_INSIDE_REPO="rev-parse --is-inside-work-tree"
 SHOW_TOP_LEVEL="rev-parse --show-toplevel"
-
+DEFAULT_REMOTE_NAME=origin
 
 # email services
 EMAIL_SERVICE="gmail"
@@ -112,6 +112,27 @@ rolling_output () {
     fi
 }
 
+verify_repo (){
+
+    local name=$1
+    # Check if we are inside a repository
+    if ! ${REPO_CMD} ${IF_INSIDE_REPO} &>/dev/null; then
+        echo -e "$HEADER${Red}ERROR: No repository for project${Color_Off}"
+        return -1
+    fi
+    return 0
+    # Check if we are inside an OPE repository
+    #output=$(${REPO_CMD} ${CHECK_REMOTES})
+    #if [[ -n $name ]] && ! echo "$output" | grep -q "$name"; then
+    #    echo -e "$HEADER${Red}ERROR: Not a valid OPE repository${Color_Off}"
+    #    return -1
+    #fi
+
+    # Check if we are inside the top level of the OPE repository
+    #if [ "$(pwd)" != "$(${REPO_CMD} ${SHOW_TOP_LEVEL})" ]; then
+    #    cd "$(${REPO_CMD} ${SHOW_TOP_LEVEL})"
+    #fi
+}
 
 get_help_from_makefile(){
     local option=$1
@@ -135,10 +156,63 @@ clone_template() {
     return 0
 }
 
+function repo_add
+#DESCRIPTION: create a new ope project from the ope templates
+{
+    local repourl=$1
+    local name=$2
+    local autopush=$3
+    
+    # Logging information
+    local func_name=${FUNCNAME[0]}
+    local func_args=$@
+    fc_header_logging "$func_name $func_args"
+
+    local pdir=$(projectdir)
+    [[ -z $pdir ]] && return -1
+       
+    # Help message
+    if [[ $name == '-h' ]]; then
+        echo "Usage:  ${0##*/} ${func_name} [git remote url] [name] [autopush]"
+        echo "   Add a git repository to the project to store and tack"
+        echo "   all the project content.  With now arguments will "
+	echo "   Indicate if there is a repo for the project and what it is"
+	echo "   Eg. ope repo_add git@github.com:myuser/opeproject.git"
+	echo " - If specified name will be used for the remote default is $DEFAULT_REMOTE_NAME"
+	echo " - If autopush is not empty then an initial push of all project content will be done"
+        return -1
+    fi
+
+    [[ -z $name ]] && name=$DEFAULT_REMOTE_NAME
+    (
+	cd $pdir
+	if ! verify_repo ; then
+	    if [[ -n $repourl ]]; then
+		echo "setting up repo"
+		$REPO_CMD $INIT
+		$REPO_CMD $ADD $OPE_CONFIG_DIR
+		$REPO_CMD $COMMIT "starting OPE Project $(cat $OPE_CONFIG_NAME)"
+		$REPO_CMD $RENAME_BRANCH main
+		$REPO_CMD $REMOTE_ADD $name $repourl
+		if [[ -n $autopush ]]; then
+		    $REPO_CMD $ADD *; $REPO_CMD $COMMIT 'starting materials'
+		    $REPO_CMD $PUSH_FIRST $name main
+		else 
+		    echo "You should now add the rest of your content to the repo and push it to the remote"
+		    echo "Eg. $REPO_CMD $ADD *; $REPO_CMD $COMMIT 'starting materials'"
+		    echo "and be sure to push your content to your remote"
+		    echo "$REPO_CMD $PUSH_FIRST $name main"
+		fi
+	    fi
+	fi
+    ) 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE) 
+}
+
 function new_project
 #DESCRIPTION: create a new ope project from the ope templates
 {
     local name=$1
+    local repo=$2
     
     # Logging information
     local func_name=${FUNCNAME[0]}
@@ -147,13 +221,14 @@ function new_project
 
     # Help message
     if [[ -z $name || $name == '-h' ]]; then
-        echo "Usage:  ${0##*/} ${func_name} <project name>"
+        echo "Usage:  ${0##*/} ${func_name} <project name> [repo url]"
         echo "   create an organization using ope template of the name specified"
         echo "   eg. ope create MyProject"
         echo "   will create a new local repository seeded from the ope "
         echo "   templates.  See the ope gettings started doc for more info."
 	echo "   Within a project you can will typically add books and containers."
 	echo "   See ope new_book and ope new_container"
+	echo "   If you supply a repository url the project will be configured with it"
         return -1
     fi
 
@@ -189,7 +264,12 @@ function new_project
 	    fi
 	done
 
-	    
+	if [[ -n $repo ]]; then
+	    (
+		cd $name
+		repo_add $repo $DEFAULT_REMOTE_NAME yes
+	    )
+	fi
     } 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE) 
 }
 
@@ -211,7 +291,7 @@ projectdir()
 	return 0
     else
 	echo -e "$HEADER${Red}ERROR: You don't seem to be in an ope project${Color_Off}" > /dev/stderr
-        exit -1
+        return -1
     fi
 }
 
@@ -226,33 +306,6 @@ new_part()
     fi
 }
 
-function repo_add
-{
-    local repourl=$1
-    local name=$2
-
-    
-    # Logging information
-    local func_name=${FUNCNAME[0]}
-    local func_args=$@
-    fc_header_logging "$func_name $func_args"
-
-    local pdir=$(projectdir)
-    
-    # Help message
-    if [[ -z $name || $name == '-h' ]]; then
-        echo "Usage:  ${0##*/} ${func_name} [git remote url] [name]"
-        echo "   Add a git repository to the project to store and tack"
-        echo "   all the project content.  With now arguments will "
-	echo "   Indicate if there is a repo for the project and what it is"
-	echo "   Eg. ope repo_add git@github.com:myuser/opeproject.git"
-        return -1
-    fi
-    (
-	cd $pdir
-	if [[ -z $
-    ) 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE) 
-}
 function new_book
 #DESCRIPTION: create a new ope project from the ope templates
 {   
@@ -264,6 +317,7 @@ function new_book
     fc_header_logging "$func_name $func_args"
 
     local pdir=$(projectdir)
+    [[ -z $pdir ]] && return -1
     
     # Help message
     if [[ -z $name || $name == '-h' ]]; then
@@ -329,6 +383,7 @@ function new_container
     fc_header_logging "$func_name $func_args"
 
     local pdir=$(projectdir)
+    [[ -z $pdir ]] && return -1
     
     # Help message
     if [[ -z $name || $name == '-h' ]]; then
