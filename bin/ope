@@ -59,10 +59,10 @@ OPE_CONFIG_DIR=".ope"
 OPE_CONFIG_NAME="${OPE_CONFIG_DIR}/name"
 OPE_PROJECT_TEMPLATE="project-template"
 OPE_CONTAINER_TEMPLATE="container-template"
+OPE_CONTAINERS_DIR=containers
 OPE_BOOK_TEMPLATE="book-template"
 OPE_BOOKS_DIR=books
 OPE_BOOK_CONTENT_SOURCE=../../content
-OPE_CONTAINER_DIR=containers
 OPE_CONTENT_TEMPLATE="content-template"
 OPE_CONTENT_DIR=content
 OPE_CONTENT_EXAMPLES="content-examples"
@@ -79,7 +79,7 @@ UPSTREAM_BRANCHES=("main" "coursecontenttemplate" "Documentation")
 # Script Configuration
 HEADER="[OPE] "
 VERBOSE=0
-LOG_FILE="/tmp/ope.log"
+LOG_FILE="/tmp/ope.$$.log"
 
 # Color Configuration
 Color_Off='\033[0m'       # Text Reset
@@ -289,6 +289,37 @@ parts:
 EOF
 	new_part ${OPE_CONTENT_DIR}/${OPE_EXAMPLE_BOOK_PART}
     ) 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE) 
+}
+
+function new_container
+#DESCRIPTION: add source for building a new container for your project
+{
+    local name=$1
+    
+    # Logging information
+    local func_name=${FUNCNAME[0]}
+    local func_args=$@
+    fc_header_logging "$func_name $func_args"
+
+    local pdir=$(projectdir)
+    
+    # Help message
+    if [[ -z $name || $name == '-h' ]]; then
+        echo "Usage:  ${0##*/} ${func_name} <container name>"
+        echo "   create source for a new container of the name specified"
+        echo "   eg. ope ${func_name} standard"
+        return -1
+    fi
+    (
+	cd $pdir
+        # Check if the container already exists 
+        if [[ -d ${OPE_CONTAINER_DIR}/$name ]]; then
+	    echo -e "$HEADER${Red}ERROR: container directory $name already exists${Color_Off}"
+	    return -1
+        fi
+        # Create the container from ope book template
+	clone_template $OPE_CONTAINER_TEMPLATE ${OPE_CONTAINERS_DIR}/$name
+    ) 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE)    
 }
 
 function update
