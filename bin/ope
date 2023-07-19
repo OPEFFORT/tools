@@ -157,7 +157,7 @@ clone_template() {
 }
 
 function repo_add
-#DESCRIPTION: create a new ope project from the ope templates
+#DESCRIPTION: add a repository to a project
 {
     local repourl=$1
     local name=$2
@@ -307,7 +307,7 @@ new_part()
 }
 
 function new_book
-#DESCRIPTION: create a new ope project from the ope templates
+#DESCRIPTION: create a new publishable book for your content
 {   
     local name=$1
     
