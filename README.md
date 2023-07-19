@@ -14,12 +14,6 @@ Here is some of my current thinking
 
 ## Book Commands
 
-### `ope part new <name>`
-
-### `ope chapter new <name>`
-
-### `ope section new <name>`
-
 ### `ope build`
 
 ### `ope publish`
@@ -49,5 +43,5 @@ We will use the project `ucsls` as a running example.
 
 1. We recommend that you create a new email address that will act as the central admin address for your project.  Eg. ucsls.organization@gmail.com.  You can then use this as the admin and identity for all online resources of your project.
 
-2. Assuming that you are using github or gitlab we recommend you create a new organization for your project.  If you will be publishing containers are part of your project we also recommend that you create an docker image registery organization.
+2. Assuming that you are using github or gitlab we recommend you create a new organization for your project.  If you will be publishing containers as part of your project we also recommend that you create an docker image registery organization.
 
