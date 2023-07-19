@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+#set -x
 # Copyright (C) 2022 by Jonathan Appavoo, Boston University
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -67,7 +67,8 @@ OPE_CONTENT_TEMPLATE="content-template"
 OPE_CONTENT_DIR=content
 OPE_CONTENT_EXAMPLES="content-examples"
 OPE_CONTENT_EXAMPLES_DIR="$OPE_CONTENT_DIR/examples"
-
+OPE_EXAMPLE_PART="$OPE_CONTENT_DIR/examples/part"
+OPE_EXAMPLE_BOOK_PART=dummy_part
 OPE_BOOK_CONTENT_SEEDS="${OPE_CONTENT_EXAMPLES_DIR}/book/intro.md ${OPE_CONTENT_EXAMPLES_DIR}/book/config.yml"
 OPE_CONTENT_SEEDS="${OPE_CONTENT_EXAMPLES_DIR}/css ${OPE_CONTENT_EXAMPLES_DIR}/python ${OPE_CONTENT_EXAMPLES_DIR}/src ${OPE_CONTENT_EXAMPLES_DIR}/images ${OPE_CONTENT_EXAMPLES_DIR}/images/logo.png"
 
@@ -137,7 +138,6 @@ clone_template() {
 function new_project
 #DESCRIPTION: create a new ope project from the ope templates
 {
-    set -x
     local name=$1
     
     # Logging information
@@ -275,6 +275,7 @@ function new_book
 		fi
 	    fi
 	done
+	
 	cat > ${OPE_CONTENT_DIR}/${name}_toc.yml <<EOF
 format: jb-book
 root: ${name}_intro
@@ -282,10 +283,11 @@ parts:
 - caption: 'Part 1'
   numbered: true
   chapters:
-  - file: part1/chapter
+  - file: ${OPE_EXAMPLE_BOOK_PART}/chapter
     sections: 
-    - file: part1/section
+    - file: ${OPE_EXAMPLE_BOOK_PART}/section
 EOF
+	new_part ${OPE_CONTENT_DIR}/${OPE_EXAMPLE_BOOK_PART}
     ) 2>&1 | tee >(sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" >> $LOG_FILE) 
 }
 
